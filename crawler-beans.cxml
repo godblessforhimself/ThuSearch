@@ -37,9 +37,9 @@
 # This Properties map is specified in the Java 'property list' text format
 # http://java.sun.com/javase/6/docs/api/java/util/Properties.html#load%28java.io.Reader%29
 
-metadata.operatorContactUrl=http://localhost
-metadata.jobName=search_engine
-metadata.description=aaa
+metadata.operatorContactUrl=http://127.0.0.1
+metadata.jobName=123
+metadata.description=123
 
 ##..more?..##
    </value>
@@ -54,9 +54,7 @@ metadata.description=aaa
     <prop key="seeds.textSource.value">
 
 # URLS HERE
-http://news.tsinghua.edu.cn/
-http://www.tsinghua.edu.cn/publish/thu2018/index.html
-http://news.tsinghua.edu.cn/publish/thunews/index.html
+http://news.tsinghua.edu.cn
 http://www.cs.tsinghua.edu.cn/
 http://graduate.tsinghua.edu.cn
 http://member.artmuseum.tsinghua.edu.cn
@@ -80,6 +78,8 @@ http://info.itc.tsinghua.edu.cn
 http://thdag.cic.tsinghua.edu.cn
 http://xsg.tsinghua.edu.cn
 http://info.tsinghua.edu.cn
+
+
     </prop>
    </props>
   </property>
@@ -87,16 +87,16 @@ http://info.tsinghua.edu.cn
 
  <!-- CRAWL METADATA: including identification of crawler/operator -->
  <bean id="metadata" class="org.archive.modules.CrawlMetadata" autowire="byName">
-       <property name="operatorContactUrl" value="http://localhost"/>
-       <property name="jobName" value="search_engine"/>
-       <property name="description" value="a test"/>
-  <!--<property name="robotsPolicyName" value="obey"/>-->
+       <property name="operatorContactUrl" value="[see override above]"/>
+       <property name="jobName" value="[see override above]"/>
+       <property name="description" value="[see override above]"/>
+  <!-- <property name="robotsPolicyName" value="obey"/> -->
   <!-- <property name="operator" value=""/> -->
   <!-- <property name="operatorFrom" value=""/> -->
   <!-- <property name="organization" value=""/> -->
   <!-- <property name="audience" value=""/> -->
-       <property name="userAgentTemplate" 
-         value="Mozilla/5.0 (compatible; heritrix/3.2.0;+@OPERATOR_CONTACT_URL@)"/>
+  <!-- <property name="userAgentTemplate" 
+         value="Mozilla/5.0 (compatible; heritrix/@VERSION@ +@OPERATOR_CONTACT_URL@)"/> -->
        
  </bean>
  
@@ -134,49 +134,22 @@ http://info.tsinghua.edu.cn
   -->
  
  <bean id="acceptSurts" class="org.archive.modules.deciderules.surt.SurtPrefixedDecideRule">
-  <!-- <property name="decision" value="ACCEPT"/> -->
-  <!-- <property name="seedsAsSurtPrefixes" value="true" /> -->
-  <!-- <property name="alsoCheckVia" value="false" /> -->
-  <!-- <property name="surtsSourceFile" value="" /> -->
-  <!-- <property name="surtsDumpFile" value="${launchId}/surts.dump" /> -->
-  <!-- <property name="surtsSource">
-        <bean class="org.archive.spring.ConfigString">
-         <property name="value">
-          <value>
-           # example.com
-           # http://www.example.edu/path1/
-           # +http://(org,example,
-          </value>
-         </property> 
-        </bean>
-       </property> -->
- </bean>
+  
 
- <!-- SCOPE: rules for which discovered URIs to crawl; order is very 
-      important because last decision returned other than 'NONE' wins. -->
- <bean id="scope" class="org.archive.modules.deciderules.DecideRuleSequence">
-  <!-- <property name="logToFile" value="false" /> -->
-  <property name="rules">
-   <list>
-    <!-- Begin by REJECTing all... -->
-    <bean class="org.archive.modules.deciderules.RejectDecideRule" />
-    <!-- ...then ACCEPT those within configured/seed-implied SURT prefixes... -->
-    <ref bean="acceptSurts" />
-    <!-- ...but REJECT those more than a configured link-hop-count from start... -->
-    <bean class="org.archive.modules.deciderules.TooManyHopsDecideRule">
-     <!-- <property name="maxHops" value="20" /> -->
-    </bean>
-    <!-- ...but ACCEPT those more than a configured link-hop-count from start... -->
-    <bean class="org.archive.modules.deciderules.TransclusionDecideRule">
-     <!-- <property name="maxTransHops" value="2" /> -->
-     <!-- <property name="maxSpeculativeHops" value="1" /> -->
-    </bean>
-    <!-- ...but REJECT those from a configurable (initially empty) set of REJECT SURTs... -->
-    <bean class="org.archive.modules.deciderules.surt.SurtPrefixedDecideRule">
-          <property name="decision" value="REJECT"/>
-          <property name="seedsAsSurtPrefixes" value="false"/>
-          <property name="surtsDumpFile" value="${launchId}/negative-surts.dump" /> 
-    <property name="surtsSource">
+<!-- <property name="decision" value="ACCEPT"/> -->
+  
+
+<!-- <property name="seedsAsSurtPrefixes" value="true" /> -->
+  
+
+<!-- <property name="alsoCheckVia" value="false" /> -->
+  
+
+<!-- <property name="surtsSourceFile" value="" /> -->
+  
+
+<!-- <property name="surtsDumpFile" value="${launchId}/surts.dump" /> -->
+  <property name="surtsSource">
         <bean class="org.archive.spring.ConfigString">
          <property name="value">
           <value>
@@ -187,31 +160,104 @@ http://info.tsinghua.edu.cn
          </property> 
         </bean>
        </property>
+ </bean>
+
+ 
+
+<!-- SCOPE: rules for which discovered URIs to crawl; order is very 
+      important because last decision returned other than 'NONE' wins. -->
+ <bean id="scope" class="org.archive.modules.deciderules.DecideRuleSequence">
+  
+
+<!-- <property name="logToFile" value="false" /> -->
+  <property name="rules">
+   <list>
+    
+
+<!-- Begin by REJECTing all... -->
+    <bean class="org.archive.modules.deciderules.RejectDecideRule" />
+    
+
+<!-- ...then ACCEPT those within configured/seed-implied SURT prefixes... -->
+    <ref bean="acceptSurts" />
+    
+    
+
+<!-- ...but REJECT those more than a configured link-hop-count from start... -->
+    <bean class="org.archive.modules.deciderules.TooManyHopsDecideRule">
+     
+
+<!-- <property name="maxHops" value="20" /> -->
     </bean>
-    <!-- ...and REJECT those from a configurable (initially empty) set of URI regexes... -->
+    
+
+<!-- ...but ACCEPT those more than a configured link-hop-count from start... -->
+    
+
+<!--<bean class="org.archive.modules.deciderules.TransclusionDecideRule"> -->
+     
+
+<!-- <property name="maxTransHops" value="2" /> -->
+     
+
+<!-- <property name="maxSpeculativeHops" value="1" /> -->
+   
+
+<!-- </bean> -->
+    
+
+<!-- ...but REJECT those from a configurable (initially empty) set of REJECT SURTs... -->
+    <bean class="org.archive.modules.deciderules.surt.SurtPrefixedDecideRule">
+          <property name="decision" value="REJECT"/>
+          <property name="seedsAsSurtPrefixes" value="false"/>
+          <property name="surtsDumpFile" value="${launchId}/negative-surts.dump" /> 
+     
+
+<!-- <property name="surtsSource">
+           <bean class="org.archive.spring.ConfigFile">
+            <property name="path" value="negative-surts.txt" />
+           </bean>
+          </property> -->
+    </bean>
+    
+
+<!-- ...and REJECT those from a configurable (initially empty) set of URI regexes... -->
     <bean class="org.archive.modules.deciderules.MatchesListRegexDecideRule">
           <property name="decision" value="REJECT"/>
-     <property name="listLogicalOr" value="true" />
-     <property name="regexList">
+      <property name="listLogicalOr" value="true" /> 
+      <property name="regexList">
            <list>
-				<value>^(?:(?!\.html)(?!\.htm)(?!\.pdf)(?!\.PDF)(?!\.doc)(?!\.docx)(?!\.DOC)(?!\.DOCX)(?!\.htmlx)(?!\.HTML)(?!\.HTM)(?!\.HTMLX).)+</value>
-				<value>[\S]*lib.tsinghua.edu.cn[\S]*</value>
-				<value>[\S]*166.111.120.[\S]*</value>
+                
+                <value>^(?:(?!\.html)(?!\.htm)(?!\.pdf)(?!\.PDF)(?!\.doc)(?!\.docx)(?!\.DOC)(?!\.DOCX)(?!\.htmlx)(?!\.HTML)(?!\.HTM)(?!\.HTMLX).)+</value>
+                <value>[\S]*lib.tsinghua.edu.cn[\S]*</value>
+           <value>[\S]*166.111.120.[\S]*</value>
            </list>
           </property>
     </bean>
-    <!-- ...and REJECT those with suspicious repeating path-segments... -->
+    
+
+<!-- ...and REJECT those with suspicious repeating path-segments... -->
     <bean class="org.archive.modules.deciderules.PathologicalPathDecideRule">
-     <!-- <property name="maxRepetitions" value="2" /> -->
+     
+
+<!-- <property name="maxRepetitions" value="2" /> -->
     </bean>
-    <!-- ...and REJECT those with more than threshold number of path-segments... -->
+    
+
+<!-- ...and REJECT those with more than threshold number of path-segments... -->
     <bean class="org.archive.modules.deciderules.TooManyPathSegmentsDecideRule">
-     <!-- <property name="maxPathDepth" value="20" /> -->
+     
+
+<!-- <property name="maxPathDepth" value="20" /> -->
     </bean>
-    <!-- ...but always ACCEPT those marked as prerequisitee for another URI... -->
+    
+
+<!-- ...but always ACCEPT those marked as prerequisitee for another URI... -->
     <bean class="org.archive.modules.deciderules.PrerequisiteAcceptDecideRule">
     </bean>
-    <!-- ...but always REJECT those with unsupported URI schemes -->
+    
+
+<!-- ...but always REJECT those with unsupported URI schemes -->
     <bean class="org.archive.modules.deciderules.SchemeNotInSetDecideRule">
     </bean>
    </list>
@@ -422,7 +468,7 @@ http://info.tsinghua.edu.cn
  <!-- CRAWLCONTROLLER: Control interface, unifying context -->
  <bean id="crawlController" 
    class="org.archive.crawler.framework.CrawlController">
-  <!--     <property name="maxToeThreads" value="25" /> -->
+  <!-- <property name="maxToeThreads" value="25" /> -->
   <!-- <property name="pauseAtStart" value="true" /> -->
   <!-- <property name="runWhileEmpty" value="false" /> -->
   <!-- <property name="recorderInBufferBytes" value="524288" /> -->
@@ -441,8 +487,8 @@ http://info.tsinghua.edu.cn
         <bean class="org.archive.crawler.frontier.precedence.BaseQueuePrecedencePolicy" />
        </property> -->
   <!-- <property name="snoozeLongMs" value="300000" /> -->
-       <property name="retryDelaySeconds" value="90" /> 
-       <property name="maxRetries" value="30" /> 
+  <!-- <property name="retryDelaySeconds" value="900" /> -->
+  <!-- <property name="maxRetries" value="30" /> -->
   <!-- <property name="recoveryLogEnabled" value="true" /> -->
   <!-- <property name="maxOutlinks" value="6000" /> -->
   <!-- <property name="extractIndependently" value="false" /> -->
