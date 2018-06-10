@@ -8,6 +8,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
@@ -25,7 +26,6 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.POIXMLDocument;
@@ -33,7 +33,6 @@ import org.apache.poi.POIXMLTextExtractor;
 import org.apache.poi.hwpf.extractor.WordExtractor;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
-import org.apache.xmlbeans.impl.common.IOUtil;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -50,15 +49,31 @@ public class fileParser {
 	public int wordcnt = 0;
 	public int htmlcnt = 0;
 	public int totalcnt = 0;
+	public boolean testmode = true;
 	public MySql ms = null;
+	public BufferedWriter log = null;
 	public fileParser()
 	{
-		ms = new MySql();
+		if (ms == null && !testmode)
+		{
+			ms = new MySql();
+		}
+		try {
+			log = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(new File("log.txt")),"utf-8"));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Runtime.getRuntime().addShutdownHook(new Thread(){
+			public void run()
+			{
+				close();
+			}
+		});
 	}
 	public void parse(String path)
 	{
 		int index = path.lastIndexOf(".") + 1;
-		int first = path.lastIndexOf("/") + 1;
 		if (index == 0)
 		{
 			System.out.println("file type error:" + path);
@@ -87,58 +102,52 @@ public class fileParser {
 				runHtmlParser(path);
 				return;
 			}
-		} 
-		//System.out.println("File Type:" + path);
+		}
 		return;
 	}
 	public void runPDFParser(String path)
 	{
+		String content = "";
+		String url = path2url(path);
 		try {
 			PDDocument document = PDDocument.load(new File(path));
 			PDFTextStripper stripper = new PDFTextStripper();
 			StringWriter writer = new StringWriter();
             stripper.writeText(document, writer);
-
-            String content = writer.getBuffer().toString();
+            content = writer.getBuffer().toString();//.replaceAll("[\\sa-zA-Z]+", "");
 			writer.close();
-			//System.out.println(content);
+			content = getChinese(content,PDF);
 			document.close();
 			if (content != null)
 			{
 				PreparedStatement p = ms.p_insertpdf;
-				
-				p.setString(1, path);
+				p.setString(1, url);
 				p.setString(2, "pdf");
 				p.setString(3, content);
-				//System.out.println(p.toString());
 				p.executeUpdate();
-				
-					
-				/*String sql = "INSERT INTO pdf " +
-						"VALUES (" + wrapContent(path) + "," +
-						wrapContent("pdf") + "," +
-						wrapContent(content) + ")";
-				ms.update(sql);*/
 			}
 			pdfcnt += 1;
 			totalcnt += 1;
 		}
 		catch (Exception e)
 		{
-			//e.printStackTrace();
-			System.out.println("runPDFParser for file: " +path + " failed!");
+			try {
+				log.write("PDF EXCEPTION:\n" + path + "\n" + e.toString() + "\n------------\n");
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		}
 	}
 	public void runDocParser(String path)
 	{
 		String content = null;
+		String url = path2url(path);
 		try
 		{
 			if (path.charAt(path.length()-1)=='x' || path.charAt(path.length()-1)=='X')
 			{
 				XWPFWordExtractor docx = new XWPFWordExtractor(POIXMLDocument.openPackage(path));
-				/*OPCPackage opcPackage = POIXMLDocument.openPackage(path);  
-		        POIXMLTextExtractor extractor = new XWPFWordExtractor(opcPackage);  */
 		        content =  docx.getText(); 
 		        docx.close();
 			}
@@ -148,42 +157,50 @@ public class fileParser {
 				content = ex.getText();
 				ex.close();
 			}
+			content = getChinese(content,WORD);
 			if (content != null)
 			{
 				PreparedStatement p = ms.p_insertdoc;
-				
-				p.setString(1, path);
+				p.setString(1, url);
 				p.setString(2, "doc");
 				p.setString(3, content);
-				//System.out.print(p.toString());
 				p.executeUpdate();
-				
-				/*String sql = "INSERT INTO doc " +
-						"VALUES (" + wrapContent(path) + "," +
-						wrapContent("doc") + "," +
-						wrapContent(content) + ")";
-				ms.update(sql);*/
 			}
 			wordcnt += 1;
 			totalcnt += 1;
 		}
 		catch (Exception e)
 		{
-			//e.printStackTrace();
-			System.out.println("runDocParser for file: " +path + " failed!");
+			try {
+				log.write("WORD EXCEPTION:\n" + path + "\n" + e.toString() + "\n------------\n");
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 		}
-		
 	}
 	public String urlAfterMirror(String path)
 	{
-		int index = path.lastIndexOf("mirror/") + 7;
+		int start = path.lastIndexOf("mirror/") + 7;
+		int end = path.lastIndexOf("/");
+		return path.substring(start, end + 1);
+	}
+	public String path2url(String path)
+	{
+		int index = path.lastIndexOf("mirror") + 7;
 		return path.substring(index);
 	}
-	public boolean checkLink(String link)
+	public String checkLink(String link, String base)
 	{
-		if (!link.startsWith("http"))
-			return false;
-		return true;
+		if (link.startsWith("http"))
+		{
+			return link.replaceAll("http[s]*://", "");
+		}
+		if (link.contains("javascript") || link.contains(";") || link.equals("") || link.equals("#"))
+		{
+			return "";
+		}
+		return (base + link).replaceAll("//", "/");
 	}
 	public static String codec(String filename){
 		String charset = "GBK";
@@ -192,9 +209,10 @@ public class fileParser {
 			charset = "UTF-8";
 		return charset;
 	}
-	
-	private static boolean isUtf(String filePath){
-		try{
+	private static boolean isUtf(String filePath)
+	{
+		try
+		{
 			FileInputStream fis=new FileInputStream(filePath);
 			byte[] bbuf=new byte[1024];
 			int L=-1;
@@ -290,82 +308,116 @@ public class fileParser {
 				return true;
 			return false;
 		}catch(IOException e){
-			System.out.println(e);
+			//System.out.println(e);
 			System.out.println("error when detect codec:" + filePath);
 			return true;
 		}
+	}
+	public static String getChinese(String str, int kind)
+	{
+		String src = "";
+		String chineseRegex = "";
+		if (kind == PDF)
+		{
+			src = str.replaceAll("\r", "\n").replaceAll("\\s{2,}", "\n");
+			chineseRegex = "([\u4e00-\u9fa5£¬¡££¿£¡£º£»¡¶¡·0-9]+)";
+		}
+		else if (kind == WORD)
+		{
+			src = str.replaceAll("\r", "\n").replaceAll("\\s{2,}", "\n");
+			chineseRegex = "([\u4e00-\u9fa5£¬¡££¿£¡£º£»¡¶¡·0-9\n]+)";
+		}
+		else if (kind == HTML)
+		{
+			src = str;
+			chineseRegex = "([\u4e00-\u9fa5]+)";
+		}
+		
+		Pattern reg = Pattern.compile(chineseRegex);
+		Matcher matcher = reg.matcher(src);
+		StringBuffer buffer = new StringBuffer();
+		while (matcher.find())
+		{
+			buffer.append(matcher.group(1));
+		}
+		return buffer.toString();
 	}
 	public void runHtmlParser(String path)
 	{
 		String input = "";
 		String content = "";
 		String charset = codec(path);
-		String temp ="";
+		String url = path2url(path);
 		try
 		{
 			StringBuilder contentBuilder = new StringBuilder();
 			BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(path), charset));
 		    String str;
 		    while ((str = in.readLine()) != null) {
-		        contentBuilder.append(str.replaceAll("\\s*", "") + "\n");
+		        contentBuilder.append(str + "\n");
 		    }
 		    in.close();
-		
-			input = contentBuilder.toString();
+		    input = contentBuilder.toString().replaceAll("<!--.*?-->", "");
 			Document doc;
-			doc = Jsoup.parse(input, urlAfterMirror(path));
-			String type = "html";
+			String baseUri = urlAfterMirror(path);
+			doc = Jsoup.parse(input);
 			String title = (doc.title() == null) ? "" : doc.title();
-			content = doc.text();
-			Elements links = doc.getElementsByTag("a");
-			String outlinks = "";
+			int MAXTITLE = 255;
+			if (title.length() > MAXTITLE)
+			{
+				title=title.substring(0,MAXTITLE);
+			}
+			content = getChinese(input,HTML);
+			Elements links = doc.select("a[href]");
 			HashSet<String> linkmap = new HashSet<String>();
 			contentBuilder = new StringBuilder();
 			for (Element i: links)
 			{
-				String linkhref = i.attr("href");
-				if (linkmap.contains(linkhref) || linkhref.length() == 0 || !checkLink(linkhref))
-				{
+				String linkhref = checkLink(i.attr("href"), baseUri).replaceAll("\\s+", "");
+				if (linkmap.contains(linkhref) || linkhref.length() == 0)
 					continue;
-				}
 				linkmap.add(linkhref);
-				contentBuilder.append(linkhref.replaceAll("\\s*", "") + "\n");
-				
+				contentBuilder.append(linkhref + "\n");
 			}
-			outlinks = contentBuilder.toString();
-			String[] hlist = {"h1", "h2"};
+			String outlinks = contentBuilder.toString();
 			String h1 = "";
 			String h2 = "";
 			Elements tags = doc.getElementsByTag("h1");
+			int H1MAX = 255;
+			int H2MAX = 255;
 			if (tags != null)
 			{
+				int l = 0;
+				int temp = 0;
 				for (Element tag: tags)
 				{
+					temp = tag.text().length() + 1;
+					if (l + temp > H1MAX)
+						break;
+					l += temp;
 					h1 += tag.text() + "\n";
 				}
 			}
 			Elements tags2 = doc.getElementsByTag("h2");
 			if (tags2 != null)
 			{
+				int l = 0;
+				int temp = 0;
 				for (Element tag: tags2)
 				{
+					temp = tag.text().length() + 1;
+					if (l + temp > H2MAX)
+						break;
+					l += temp;
 					h2 += tag.text() + "\n";
 				}
 			}
-			/*title = coder(title);
-			content = coder(content);
-			h1 = coder(h1);
-			h2 = coder(h2);
-			outlinks = coder(outlinks);
-			System.out.println("path:"+path);
-			System.out.println("title:"+title);
-			System.out.println("content:"+content);
-			System.out.println("h1:"+h1);
-			System.out.println("h2:"+h2);
-			System.out.println("outlinks:"+outlinks);*/
-			
 			PreparedStatement p = ms.p_insert8;
-			p.setString(1, path);
+			if (url==null || title==null || h1 == null || h2 == null || content == null || outlinks == null)
+			{
+				System.out.println("null");
+			}
+			p.setString(1, url);
 			p.setString(2, "html");
 			p.setString(3, title);
 			p.setString(4, h1);
@@ -374,90 +426,84 @@ public class fileParser {
 			p.setString(7, outlinks);
 			p.setFloat(8, 0.0f);
 			p.executeUpdate();
-	
-			
-			/*String sql = "INSERT INTO html " +
-						"VALUES (" + wrapContent(path) + "," +
-						wrapContent("html") + "," +
-						wrapContent(title) + "," +
-						wrapContent(h1) + "," +
-						wrapContent(h2) + "," +
-						wrapContent(content) + ","
-						+ wrapContent(outlinks) + ")";
-			System.out.println(sql);
-			ms.update(sql);*/
 			htmlcnt += 1;
 			totalcnt += 1;
 		}
 		catch (Exception e)
 		{
-			System.out.println(charset + " path:" + path);
-			//System.out.println(input.substring(0,300));
-			//System.out.println(temp.substring(0,300));
-			/*try {
-				System.out.println(new String(temp.getBytes("gb2312"),"utf8"));
-			} catch (UnsupportedEncodingException e1) {
-				// TODO Auto-generated catch block
+			try {
+				log.write("Html EXCEPTION:\n" + path + "\n" + e.toString() + "\n------------\n");
+			} catch (IOException e1) {
 				e1.printStackTrace();
-			}*/
-			//e.printStackTrace();
-			//System.out.println("runHtmlParser for file: " +path + " failed!");
+			}
 		}
-		
 	}
-	public static void main(String[] args)
+	public void close()
 	{
-		//String rootdir = "C:/resource/search_engine/mirror/academic.tsinghua.edu.cn";
-		String rootdir = "C:/resource/search_engine/20180603112306/mirror";
-		
-		final fileParser p = new fileParser();
-		//p.ms.DropAllTables();
+		if (ms != null)
+		ms.closeAll();
 		try {
-			final long t0 = System.currentTimeMillis();
-			Files.walkFileTree(Paths.get(rootdir), new SimpleFileVisitor<Path>()
-			{
-				@Override
-			    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-			        // TODO Auto-generated method stub
-			        String dirname = dir.toString();
-			        //System.out.println("visiting dir:" + dirname);
-			        return FileVisitResult.CONTINUE;
-			    }
-
-			    @Override
-			    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-			        // TODO Auto-generated method stub
-			        String filename = file.toString().replace("\\", "/");
-			        if (p.totalcnt % 1000 == 0)
-			        {
-			        	System.out.println(p.totalcnt +": takes " + (System.currentTimeMillis() - t0) / 1000 + " seconds!");
-			        	//t0 = System.currentTimeMillis();
-			        }
-					//System.out.println("parsing file:" + filename);
-			        p.parse(filename);
-			        return FileVisitResult.CONTINUE;
-			    }
-			});
+			log.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		/*try
+	}
+	public static void main(String[] args)
+	{
+		final fileParser p = new fileParser();
+		if (p.testmode)
 		{
-			String sql = "select * from html";
-			ResultSet rs = p.ms.read(sql);
-			while (rs.next())
-			{
-				//System.out.println("get from database:");
-				for (int i = 0; i < 7; i ++)
+			try {
+				String check = "check.txt";
+				BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(check)));
+				String path = "";
+				while ((path = in.readLine()) != null)
 				{
-					//System.out.println("info:"+(rs.getString(i + 1)));
+					p.parse(path);
 				}
+				in.close();
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
 			}
 		}
-		catch (Exception e)
+		else
 		{
-			e.printStackTrace();
-		}*/
+			String testset = "C:/resource/search_engine/20180603112306/mirror/alumni.sem.tsinghua.edu.cn";
+			String allset = "C:/resource/search_engine/20180603112306/mirror";
+			String rootdir = allset;
+			try {
+				p.ms.DropAllTables();
+				p.ms.createTables();
+				final long t0 = System.currentTimeMillis();
+				Files.walkFileTree(Paths.get(rootdir), new SimpleFileVisitor<Path>()
+				{
+					@Override
+				    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				        return FileVisitResult.CONTINUE;
+				    }
+
+				    @Override
+				    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				        String filename = file.toString().replace("\\", "/");
+				        if (p.totalcnt % 50 == 0)
+				        {
+				        	System.out.println(p.totalcnt +": takes " + (System.currentTimeMillis() - t0) / 1000 + " seconds!");
+				        }
+				        p.parse(filename);
+				        return FileVisitResult.CONTINUE;
+				    }
+				});
+				System.out.println("All takes " + (System.currentTimeMillis() - t0) / 1000 + " seconds!");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}finally
+			{
+				System.out.println("Total "+p.totalcnt+" files("+p.pdfcnt+" pdfs," + p.wordcnt+ " docs," + p.htmlcnt + " htmls)");
+			}
+		}
+		p.close();
 	}
 }
