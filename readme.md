@@ -67,6 +67,10 @@ http://info.tsinghua.edu.cn
  ```
   <bean id="warcWriter" class="org.archive.modules.writer.MirrorWriterProcessor"> </bean>
  ```
+ #### 资源抓取遇到的困难
+    - 按照作业说明提供的1.x版本heritrix的配置抓取不到文档。
+    - heritrix 3.x 配置只能通过修改crawl-beans.cxml文档。在建立heritrix 3.x源码版本，建立自己的抓取项目时遇到了一些依赖和maven配置的问题，暂未解决。
+    - heritrix 3.x 抓取文档需要2-3天时间。
  ### 参考 https://github.com/ChenGuangbinTHU/THUSearchEngine/blob/master/WebPreprocess/crawler-beans.cxml
  
  ## 资源预处理
@@ -97,7 +101,7 @@ http://info.tsinghua.edu.cn
     通过使用fileParser.codec(String filename)->fileParser.isUtf(String filename)先判断编码，再用文件流指定编码读入文件。
   - 抓取的一些pdf\doc文档损坏。暂时不记录这些损坏文件的数据。未解决。
   - 抓取的一些doc文件缺失一些css,无法通过POI解析。暂未解决。
-  - 遍历一次mirror/下的文件，约3小时。可以引入并行提速。
+  - 遍历一次mirror/下的文件，约3小时。可以并行提速。
   
  
  
